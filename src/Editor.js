@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +30,7 @@ export default function Editor({ note, onClose, onSaved }) {
   const [convert, setConvert] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [discard, setDiscard] = useState(false);
-  const [loadedStamp, setLoadedStamp] = useState(note?.lastModified || 0);
+  const [loadedStamp] = useState(note?.lastModified || 0);
   const [conflict, setConflict] = useState(false);
   const bg = BG_STYLES[bgStyle];
   const mark = (fn) => (v) => { setDirty(true); fn(v); };
@@ -127,14 +127,14 @@ export default function Editor({ note, onClose, onSaved }) {
 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: S.xl, paddingBottom: 160 }}>
           <TextInput value={title} onChangeText={mark(setTitle)} placeholder="Title" placeholderTextColor={C.textSecondary}
-            style={{ color: textColor, fontFamily: F.bold, fontSize: 26, outlineStyle: 'none', paddingVertical: S.s }} />
+            style={{ color: textColor, fontFamily: F.regular, fontWeight: '700', fontSize: 26, outlineStyle: 'none', paddingVertical: S.s }} />
           <Txt style={{ color: C.textSecondary, fontSize: T.micro, marginBottom: S.l }}>
             {isEdit ? `${note.date} • ${note.time}` : fmtDateTime(new Date())}  •  {words} words
           </Txt>
 
           {checklist ? (
             <View>
-              {items.map((it, i) => (
+              {items.map((it) => (
                 <View key={it.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: S.s }}>
                   <Pressable hitSlop={8} onPress={() => { haptic(); setDirty(true); setItems(items.map((x) => (x.id === it.id ? { ...x, checked: !x.checked } : x))); }}>
                     <Ionicons name={it.checked ? 'checkbox' : 'square-outline'} size={24} color={it.checked ? C.gold : C.textSecondary} />
