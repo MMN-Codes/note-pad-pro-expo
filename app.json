@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Note Pad Pro",
+    "slug": "note-pad-pro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0F1015",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "mmn.notepadpro.app",
+      "infoPlist": { "NSFaceIDUsageDescription": "Unlock your locked notes with Face ID." }
+    },
+    "android": {
+      "package": "mmn.notepadpro.app",
+      "permissions": ["android.permission.SCHEDULE_EXACT_ALARM", "android.permission.USE_BIOMETRIC", "android.permission.POST_NOTIFICATIONS"]
+    },
+    "web": { "bundler": "metro" },
+    "plugins": [
+      ["expo-notifications", { "color": "#FFD700" }],
+      "expo-font",
+      "expo-local-authentication"
+    ]
+  }
+}
