@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R, S, T } from './theme';
+import { C, R, S, T, alpha } from './theme';
 import { Glass, IconBtn, Txt, haptic } from './ui';
 import NoteCard from './NoteCard';
 import { cmpStr, fmtDate } from './utils';
@@ -53,9 +53,9 @@ export default function Calendar({ notes, onOpen }) {
               return (
                 <Pressable key={i} onPress={() => { haptic(); setPicked(key); }} style={{ width: `${100 / 7}%`, height: 44, padding: 2 }}>
                   <View style={{ flex: 1, borderRadius: R.s, alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: c ? `rgba(255,215,0,${heat(c)})` : 'transparent', borderWidth: sel ? 2 : isToday ? 1 : 0,
-                    borderColor: sel ? C.gold : 'rgba(255,255,255,0.4)' }}>
-                    <Txt medium style={{ fontSize: T.caption, color: c >= 3 ? '#1A1A1A' : C.textPrimary }}>{d}</Txt>
+                    backgroundColor: c ? alpha(C.gold, heat(c)) : 'transparent', borderWidth: sel ? 2 : isToday ? 1 : 0,
+                    borderColor: sel ? C.gold : C.hairline }}>
+                    <Txt medium style={{ fontSize: T.caption, color: c >= 3 ? C.onAccent : C.textPrimary }}>{d}</Txt>
                   </View>
                 </Pressable>
               );
