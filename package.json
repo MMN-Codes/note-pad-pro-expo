@@ -1,0 +1,33 @@
+{
+  "name": "note-pad-pro",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "fix-deps": "expo install --fix"
+  },
+  "dependencies": {
+    "expo": "~57.0.21",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-web": "*",
+    "react-native-safe-area-context": "*",
+    "@react-native-async-storage/async-storage": "*",
+    "@expo/vector-icons": "*",
+    "expo-blur": "*",
+    "expo-linear-gradient": "*",
+    "expo-font": "*",
+    "expo-haptics": "*",
+    "expo-local-authentication": "*",
+    "expo-notifications": "*",
+    "expo-status-bar": "*"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0"
+  }
+}
