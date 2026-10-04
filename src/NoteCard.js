@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BG_STYLES, C, F, PRISM, R, S, T } from './theme';
+import { BG_STYLES, C, F, PRISM, R, S, T, alpha } from './theme';
 import { Glass, Txt } from './ui';
 import { checklistProgress, notePreview } from './rules';
 import { daysLeftInTrash } from './utils';
@@ -15,7 +15,7 @@ function Highlight({ text, query, style, numberOfLines }) {
   return (
     <Text style={style} numberOfLines={numberOfLines}>
       {parts.map((p, i) => p.toLowerCase() === query.toLowerCase()
-        ? <Text key={i} style={{ backgroundColor: 'rgba(255,215,0,0.35)', color: C.gold }}>{p}</Text>
+        ? <Text key={i} style={{ backgroundColor: alpha(C.gold, 0.35), color: C.textPrimary }}>{p}</Text>
         : <Text key={i}>{p}</Text>)}
     </Text>
   );
@@ -35,7 +35,7 @@ export default function NoteCard({ note, onPress, onLongPress, query = '', grid,
       {note.hasReminder && <Ionicons name="alarm" size={16} color={C.blue} style={{ marginLeft: 6 }} />}
       {note.isLocked && <Ionicons name="lock-closed" size={15} color={subColor} style={{ marginLeft: 6 }} />}
       {trash && (
-        <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 1, borderRadius: R.xs, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+        <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 1, borderRadius: R.xs, backgroundColor: C.soft }}>
           <Text style={{ color: C.danger, fontFamily: F.regular, fontWeight: '700', fontSize: T.micro }}>{daysLeftInTrash(note.trashedDate)}d</Text>
         </View>
       )}
@@ -51,7 +51,7 @@ export default function NoteCard({ note, onPress, onLongPress, query = '', grid,
         contentStyle={{ padding: S.l, flexDirection: 'row', minHeight: grid ? 120 : 0 }}>
         {showBadge && (
           <View style={{ width: 56, height: 56, borderRadius: R.s, marginRight: S.m, alignItems: 'center',
-            justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
+            justifyContent: 'center', backgroundColor: C.soft }}>
             <Text style={{ color: C.gold, fontFamily: F.regular, fontWeight: '700', fontSize: T.micro }}>{done}/{total}</Text>
           </View>
         )}
