@@ -9,7 +9,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "mmn.notepadpro.app",
-      "infoPlist": { "NSFaceIDUsageDescription": "Unlock your locked notes with Face ID." }
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Unlock your locked notes with Face ID."
+      }
     },
     "android": {
       "package": "mmn.notepadpro.app",
@@ -19,9 +21,16 @@
         "android.permission.POST_NOTIFICATIONS"
       ]
     },
-    "web": { "bundler": "metro" },
+    "web": {
+      "bundler": "metro"
+    },
     "plugins": [
-      ["expo-notifications", { "color": "#FFD700" }],
+      [
+        "expo-notifications",
+        {
+          "color": "#FFD700"
+        }
+      ],
       "expo-local-authentication"
     ]
   }
