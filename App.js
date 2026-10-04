@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import * as Font from 'expo-font';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, F, R, S } from './src/theme';
-import { Background, Glass, ToastProvider, Txt, haptic, useToast, squircle } from './src/ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { C, R, S } from './src/theme';
+import { Background, Glass, ToastProvider, haptic, useToast } from './src/ui';
 import { addNote, getAllNotes, getNotesWithReminders, getTrashNotes, newNote, purgeOldTrash } from './src/db';
 import { initNotifications, rescheduleAll } from './src/notify';
 import { authenticate } from './src/lock';
 import { fmtDate, fmtTime } from './src/utils';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Home from './src/Home';
 import Editor from './src/Editor';
 import Trash from './src/Trash';
@@ -39,6 +38,7 @@ function NavIsland({ tab, setTab, onNew }) {
     </View>
   );
 }
+
 const Tab = ({ k, on, off, tab, setTab }) => (
   <Pressable onPress={() => { haptic(); setTab(k); }} style={styles.tab}>
     <Ionicons name={tab === k ? on : off} size={24} color={tab === k ? C.gold : C.textSecondary} />
@@ -52,7 +52,7 @@ function Shell() {
   const [notes, setNotes] = useState([]);
   const [trash, setTrash] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null); // { note|null }
+  const [editing, setEditing] = useState(null); // { note | null }
   const [selecting, setSelecting] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -63,7 +63,7 @@ function Shell() {
   useEffect(() => {
     (async () => {
       await initNotifications();
-      await purgeOldTrash();                       // 30-day auto-purge on launch
+      await purgeOldTrash(); // 30-day auto-purge on launch
       // first-run welcome note (pinned), as MainActivity.createWelcomeNote()
       const seen = await AsyncStorage.getItem('is_first_run_welcome_done');
       if (!seen) {
@@ -76,14 +76,14 @@ function Shell() {
         await AsyncStorage.setItem('is_first_run_welcome_done', '1');
       }
       await refresh();
-      rescheduleAll(await getNotesWithReminders());  // BootReceiver equivalent
+      rescheduleAll(await getNotesWithReminders()); // BootReceiver equivalent
     })();
   }, [refresh]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return undefined;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (editing) return false;              // Editor's own back handler is the header button
+      if (editing) return false; // Editor has its own back button
       if (selecting) { setSelecting(false); return true; }
       if (tab !== 'home') { setTab('home'); return true; }
       return false;
@@ -122,15 +122,6 @@ function Shell() {
 }
 
 export default function App() {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    Font.loadAsync({
-      'NPP-Regular': require('./assets/fonts/regular.ttf'),
-      'NPP-Medium': require('./assets/fonts/medium.ttf'),
-      'NPP-Bold': require('./assets/fonts/bold.ttf'),
-    }).catch(() => {}).finally(() => setReady(true));
-  }, []);
-  if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg, justifyContent: 'center' }}><ActivityIndicator color={C.gold} /></View>;
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
