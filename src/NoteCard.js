@@ -36,7 +36,7 @@ export default function NoteCard({ note, onPress, onLongPress, query = '', grid,
       {note.isLocked && <Ionicons name="lock-closed" size={15} color={subColor} style={{ marginLeft: 6 }} />}
       {trash && (
         <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 1, borderRadius: R.xs, backgroundColor: 'rgba(255,255,255,0.08)' }}>
-          <Text style={{ color: C.danger, fontFamily: F.bold, fontSize: T.micro }}>{daysLeftInTrash(note.trashedDate)}d</Text>
+          <Text style={{ color: C.danger, fontFamily: F.regular, fontWeight: '700', fontSize: T.micro }}>{daysLeftInTrash(note.trashedDate)}d</Text>
         </View>
       )}
     </View>
@@ -52,13 +52,13 @@ export default function NoteCard({ note, onPress, onLongPress, query = '', grid,
         {showBadge && (
           <View style={{ width: 56, height: 56, borderRadius: R.s, marginRight: S.m, alignItems: 'center',
             justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}>
-            <Text style={{ color: C.gold, fontFamily: F.bold, fontSize: T.micro }}>{done}/{total}</Text>
+            <Text style={{ color: C.gold, fontFamily: F.regular, fontWeight: '700', fontSize: T.micro }}>{done}/{total}</Text>
           </View>
         )}
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Highlight text={title} query={query} numberOfLines={1}
-              style={{ flex: 1, color: titleColor, fontFamily: F.bold, fontSize: T.title }} />
+              style={{ flex: 1, color: titleColor, fontFamily: F.regular, fontWeight: '700', fontSize: T.title }} />
             {icons}
           </View>
           <Highlight text={notePreview(note)} query={note.isLocked ? '' : query} numberOfLines={grid ? 4 : 2}
