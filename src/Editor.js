@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AppState, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BG_STYLES, C, F, R, S, T } from './theme';
@@ -12,10 +12,12 @@ import { checklistFromJson, checklistPlainSummary, checklistToJson, fmtDate, fmt
 const REPEATS = [['none', 'Once'], ['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']];
 const QUICK = [['In 1 hour', 60], ['In 3 hours', 180], ['Tomorrow 9:00', 'tm9'], ['Next week', 10080]];
 
-export default function Editor({ note, onClose, onSaved }) {
+export default function Editor({ note, onClose, onSaved, autoSave = true }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const isEdit = !!note;
+  const savedRef = useRef(note || null);          // becomes set after first (silent) save
+  const stampRef = useRef(note?.lastModified || 0);
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(htmlToPlain(note?.content));
   const [checklist, setChecklist] = useState(!!note?.isChecklist);
@@ -30,7 +32,6 @@ export default function Editor({ note, onClose, onSaved }) {
   const [convert, setConvert] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [discard, setDiscard] = useState(false);
-  const [loadedStamp] = useState(note?.lastModified || 0);
   const [conflict, setConflict] = useState(false);
   const bg = BG_STYLES[bgStyle];
   const mark = (fn) => (v) => { setDirty(true); fn(v); };
@@ -71,43 +72,72 @@ export default function Editor({ note, onClose, onSaved }) {
     setRemDate(d); setDirty(true);
   };
 
-  const save = async (force = false) => {
-    const t = title.trim();
-    if (!t) { toast('Please enter a title', 'error'); return; }
+  // mode: 'manual' (Save button) | 'auto' (back press, auto_save on) | 'silent' (app backgrounded)
+  const save = async (force = false, mode = 'manual') => {
+    let t = title.trim();
+    if (!t) {
+      if (mode === 'manual') { toast('Please enter a title', 'error'); return; }
+      t = 'Untitled Note'; setTitle(t);               // AddEditNoteActivity.onBackPressed()
+    }
     try {
-      if (isEdit && !force) {
-        const fresh = await getNote(note.id);
-        if (fresh && fresh.lastModified > loadedStamp) { setConflict(true); return; } // sync-conflict guard
+      const base = savedRef.current;
+      if (base && !force && mode !== 'silent') {
+        const fresh = await getNote(base.id);
+        if (fresh && fresh.lastModified > stampRef.current) { setConflict(true); return; } // sync-conflict guard
       }
       const now = new Date();
       const body = checklist ? checklistPlainSummary(items) : content;
-      const n = isEdit ? { ...note } : newNote(t, body, fmtDate(now), fmtTime(now));
+      const n = base ? { ...base } : newNote(t, body, fmtDate(now), fmtTime(now));
       n.title = t; n.content = body; n.date = fmtDate(now); n.time = fmtTime(now);
       n.isChecklist = checklist; n.checklistJson = checklist ? checklistToJson(items) : null;
       n.bgStyle = bgStyle; n.isPinned = pinned;
 
-      if (isEdit && note.hasReminder) await cancelReminder(note.id);
       let remOk = false;
-      if (remOn) {
-        n.reminderTime = fmtDateTime(remDate); n.hasReminder = true; n.repeatInterval = repeat;
-        const r = await scheduleReminder(n);
-        remOk = r.ok;
-        if (!r.ok) {
-          n.hasReminder = r.reason === 'unsupported'; // keep the data on web, just no alarm
-          if (r.reason === 'past') toast('Please select a future time', 'error');
-          if (r.reason === 'permission') toast('Notification permission missing. Reminder NOT set.', 'error');
-          if (!n.hasReminder) n.reminderTime = null;
-        }
-      } else { n.hasReminder = false; n.reminderTime = null; n.repeatInterval = 'none'; }
+      if (mode !== 'silent') {
+        if (base && base.hasReminder) await cancelReminder(base.id);
+        if (remOn) {
+          n.reminderTime = fmtDateTime(remDate); n.hasReminder = true; n.repeatInterval = repeat;
+          const r = await scheduleReminder(n);
+          remOk = r.ok;
+          if (!r.ok) {
+            n.hasReminder = r.reason === 'unsupported'; // keep the data on web, just no alarm
+            if (r.reason === 'past') toast('Please select a future time', 'error');
+            if (r.reason === 'permission') toast('Notification permission missing. Reminder NOT set.', 'error');
+            if (!n.hasReminder) n.reminderTime = null;
+          }
+        } else { n.hasReminder = false; n.reminderTime = null; n.repeatInterval = 'none'; }
+      }
 
-      if (isEdit) await updateNote(n); else await addNote(n);
+      if (base) await updateNote(n); else await addNote(n);
+      savedRef.current = n;
+      const fresh2 = await getNote(n.id);
+      stampRef.current = fresh2 ? fresh2.lastModified : Date.now();
+      if (mode === 'silent') { setDirty(false); return; }
       haptic('success');
-      toast(`${isEdit ? 'Note updated' : 'Note saved'}${remOk ? ' with reminder' : ''}`, 'success');
+      toast(`${base ? 'Note updated' : 'Note saved'}${remOk ? ' with reminder' : ''}`, 'success');
       onSaved();
     } catch (e) { toast(`Error saving note: ${e.message}`, 'error'); }
   };
 
-  const close = () => (dirty ? setDiscard(true) : onClose());
+  // Back press rules from AddEditNoteActivity.onBackPressed()
+  const isEmptyNew = () => !savedRef.current && !title.trim() && !(checklist ? items.some((i) => i.text.trim()) : content.trim());
+  const close = () => {
+    if (isEmptyNew() || !dirty) return onClose();
+    if (autoSave) return save(false, 'auto');
+    setDiscard(true);
+  };
+  const latest = useRef({});
+  latest.current = { close, save, dirty, autoSave, isEmptyNew };
+  useEffect(() => {
+    // onPause() silent auto-save
+    const sub = AppState.addEventListener('change', (st) => {
+      const l = latest.current;
+      if (st !== 'active' && l.autoSave && l.dirty && !l.isEmptyNew()) l.save(true, 'silent');
+    });
+    const back = Platform.OS === 'android'
+      ? BackHandler.addEventListener('hardwareBackPress', () => { latest.current.close(); return true; }) : null;
+    return () => { sub.remove(); back && back.remove(); };
+  }, []);
   const share = () => Share.share({ title, message: `${title}\n\n${checklist ? checklistPlainSummary(items) : content}`.trim() }).catch(() => {});
   const textColor = bg ? bg.text : C.textPrimary;
 
@@ -121,7 +151,7 @@ export default function Editor({ note, onClose, onSaved }) {
           <IconBtn name={remOn ? 'alarm' : 'alarm-outline'} active={remOn} onPress={() => setRemSheet(true)} />
           <IconBtn name="share-outline" onPress={share} />
           <Pressable onPress={() => { haptic('medium'); save(); }} style={{ marginLeft: S.s, height: 40, paddingHorizontal: S.l, borderRadius: R.pill, backgroundColor: C.gold, justifyContent: 'center' }}>
-            <Txt bold style={{ color: '#1A1A1A' }}>Save</Txt>
+            <Txt bold style={{ color: C.onAccent }}>Save</Txt>
           </Pressable>
         </View>
 
@@ -134,7 +164,7 @@ export default function Editor({ note, onClose, onSaved }) {
 
           {checklist ? (
             <View>
-              {items.map((it) => (
+              {items.map((it, i) => (
                 <View key={it.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: S.s }}>
                   <Pressable hitSlop={8} onPress={() => { haptic(); setDirty(true); setItems(items.map((x) => (x.id === it.id ? { ...x, checked: !x.checked } : x))); }}>
                     <Ionicons name={it.checked ? 'checkbox' : 'square-outline'} size={24} color={it.checked ? C.gold : C.textSecondary} />
