@@ -183,3 +183,35 @@ export const purgeOldTrash = async () => {
   await write(() => { rows = rows.filter((r) => !ids.includes(r.id)); });
   return ids;
 };
+
+// ---- Backup helpers (BackupManager JSON format, snake_case keys) -------------------------
+const effectiveTs = (r) => (r.last_modified > 0 ? r.last_modified : parseNoteTimestamp(r.date, r.time));
+export const exportAllRows = () => read(() => rows.map((r) => ({
+  id: r.id, title: r.title, content: r.content, date: r.date, time: r.time,
+  reminder_time: r.reminder_time, has_reminder: r.has_reminder === 1, is_pinned: r.is_pinned === 1,
+  is_locked: r.is_locked === 1, bg_style: r.bg_style, is_checklist: r.is_checklist === 1,
+  checklist_json: r.checklist_json, repeat_interval: r.repeat_interval, cover_image_path: r.cover_image_path,
+  is_trashed: r.is_deleted === 1, last_modified: effectiveTs(r),
+})));
+
+// SmartMergeEngine (simplified): unknown id -> add, same id -> newer last_modified wins
+export const importRows = (incoming) => write(() => {
+  let added = 0, updated = 0, skipped = 0;
+  incoming.forEach((o, i) => {
+    const id = String(o.id ?? `${Date.now()}${i}`);
+    const row = {
+      id, title: o.title ?? '', content: o.content ?? '', date: o.date ?? '', time: o.time ?? '',
+      reminder_time: o.reminder_time ?? null, has_reminder: o.has_reminder ? 1 : 0,
+      is_pinned: o.is_pinned ? 1 : 0, is_deleted: o.is_trashed ? 1 : 0, is_locked: o.is_locked ? 1 : 0,
+      trashed_date: o.is_trashed ? Date.now() : 0, bg_style: o.bg_style || 'none',
+      is_checklist: o.is_checklist ? 1 : 0, checklist_json: o.checklist_json ?? null,
+      repeat_interval: o.repeat_interval || 'none', cover_image_path: o.cover_image_path ?? null,
+      last_modified: Number(o.last_modified) || parseNoteTimestamp(o.date, o.time),
+    };
+    const cur = find(id);
+    if (!cur) { rows.push(row); added++; }
+    else if (row.last_modified > effectiveTs(cur)) { Object.assign(cur, row); updated++; }
+    else skipped++;
+  });
+  return { added, updated, skipped };
+});
