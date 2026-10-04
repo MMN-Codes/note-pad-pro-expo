@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 // Tokens mirror res/values/dimens.xml + colors.xml of the Android app.
 export const C = {
   bg: '#0F1015',
@@ -18,7 +20,10 @@ export const PRISM = [
 export const T = { micro: 11, caption: 13, body: 15, title: 17, headline: 22, display: 28 };
 export const R = { xs: 8, s: 12, m: 16, l: 24, sheet: 28, pill: 999 };
 export const S = { xxs: 2, xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, x3: 32, x4: 48 };
-export const F = { regular: 'NPP-Regular', medium: 'NPP-Medium', bold: 'NPP-Bold' };
+
+// System font on every platform (no binary font files, so Snack import works)
+const SYS = Platform.select({ ios: 'System', android: 'sans-serif', default: 'system-ui, -apple-system, sans-serif' });
+export const F = { regular: SYS, medium: SYS, bold: SYS };
 
 // NoteBackgroundDrawable dark-mode presets: [fill, stroke, text]
 export const BG_STYLES = {
