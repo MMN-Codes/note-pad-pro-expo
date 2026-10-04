@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, F, PRISM, R, S, T } from './theme';
+import { C, F, PRISM, R, S, T, alpha } from './theme';
 
 export const haptic = (kind = 'light') => {
   if (Platform.OS === 'web') return;
@@ -22,7 +22,7 @@ export function Glass({ radius = R.l, blur = true, intensity = 40, fill = C.glas
   style, contentStyle, children, borderColors = PRISM }) {
   const inner = (
     <View style={[{ borderRadius: radius - (border ? 1 : 0), overflow: 'hidden' }, squircle]}>
-      {blur && <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFill} />}
+      {blur && !C.lite && <BlurView intensity={intensity} tint={C.isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />}
       <View style={[{ backgroundColor: fill }, contentStyle]}>{children}</View>
     </View>
   );
@@ -39,19 +39,21 @@ export function Background({ children }) {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <LinearGradient colors={['#0F1015', '#12151D', '#0F1015']} style={StyleSheet.absoluteFill} />
-        <View style={[styles.orb, { top: -80, right: -60, backgroundColor: 'rgba(255,215,0,0.10)' }]} />
-        <View style={[styles.orb, { bottom: 120, left: -90, backgroundColor: 'rgba(147,197,253,0.10)' }]} />
+        {C.bgGradient && <LinearGradient colors={C.bgGradient} style={StyleSheet.absoluteFill} />}
+        {C.glowTop && <View style={[styles.orb, { top: -120, backgroundColor: C.glowTop.color, width: 380, height: 380, borderRadius: 190 },
+          C.glowTop.side === 'right' ? { right: -100 } : C.glowTop.side === 'left' ? { left: -100 } : { alignSelf: 'center' }]} />}
+        {C.glowBottom && <View style={[styles.orb, { bottom: 60, backgroundColor: C.glowBottom.color, width: 340, height: 340, borderRadius: 170 },
+          C.glowBottom.side === 'right' ? { right: -110 } : { left: -110 }]} />}
       </View>
       {children}
     </View>
   );
 }
 
-export function IconBtn({ name, onPress, size = 22, color = C.textPrimary, style, active }) {
+export function IconBtn({ name, onPress, size = 22, color = C.iconTint, style, active }) {
   return (
     <Pressable onPress={() => { haptic(); onPress && onPress(); }} hitSlop={8}
-      style={({ pressed }) => [styles.iconBtn, active && { backgroundColor: 'rgba(255,215,0,0.14)' }, pressed && { opacity: 0.6 }, style]}>
+      style={({ pressed }) => [styles.iconBtn, active && { backgroundColor: alpha(C.gold, 0.16) }, pressed && { opacity: 0.6 }, style]}>
       <Ionicons name={name} size={size} color={active ? C.gold : color} />
     </Pressable>
   );
@@ -64,7 +66,7 @@ export const Txt = ({ style, bold, medium, ...p }) => (
 export function Chip({ label, selected, onPress, icon }) {
   return (
     <Pressable onPress={() => { haptic(); onPress(); }}
-      style={[styles.chip, selected && { backgroundColor: 'rgba(255,215,0,0.16)', borderColor: C.gold }]}>
+      style={[styles.chip, { borderColor: C.hairline, backgroundColor: C.soft }, selected && { backgroundColor: alpha(C.gold, 0.16), borderColor: C.gold }]}>
       {icon ? <Ionicons name={icon} size={14} color={selected ? C.gold : C.textSecondary} style={{ marginRight: 6 }} /> : null}
       <Txt medium style={{ fontSize: T.caption, color: selected ? C.gold : C.textPrimary }}>{label}</Txt>
     </Pressable>
@@ -72,8 +74,8 @@ export function Chip({ label, selected, onPress, icon }) {
 }
 
 export function GoldButton({ label, onPress, icon, danger, subtle, style }) {
-  const bg = danger ? 'rgba(239,68,68,0.18)' : subtle ? 'rgba(255,255,255,0.08)' : C.gold;
-  const fg = danger ? C.danger : subtle ? C.textPrimary : '#1A1A1A';
+  const bg = danger ? 'rgba(239,68,68,0.18)' : subtle ? C.soft : C.gold;
+  const fg = danger ? C.danger : subtle ? C.textPrimary : C.onAccent;
   return (
     <Pressable onPress={() => { haptic('medium'); onPress(); }}
       style={({ pressed }) => [{ height: 48, borderRadius: R.m, backgroundColor: bg, alignItems: 'center',
@@ -103,14 +105,14 @@ export function GlassSheet({ visible, onClose, title, children, maxHeight = 0.85
   ]).start(() => onClose && onClose());
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={close} statusBarTranslucent>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: fade }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: C.scrim, opacity: fade }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={close} />
       </Animated.View>
       <Animated.View pointerEvents="box-none" style={[styles.sheetWrap, { transform: [{ translateY: y }] }]}>
-        <Glass radius={R.sheet} fill="rgba(22,23,30,0.88)" intensity={60}
+        <Glass radius={R.sheet} fill={C.sheet} intensity={60}
           style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, maxHeight: `${maxHeight * 100}%` }}
           contentStyle={{ paddingTop: S.s, paddingHorizontal: S.xl, paddingBottom: insets.bottom + S.xl }}>
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: 'rgba(128,128,128,0.45)' }]} />
           {title ? <Txt bold style={{ fontSize: T.headline, marginVertical: S.m }}>{title}</Txt> : null}
           {typeof children === 'function' ? children(close) : children}
         </Glass>
@@ -122,7 +124,7 @@ export function GlassSheet({ visible, onClose, title, children, maxHeight = 0.85
 export function SheetRow({ icon, label, onPress, danger, trailing }) {
   return (
     <Pressable onPress={() => { haptic(); onPress(); }}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.soft }]}>
       <Ionicons name={icon} size={22} color={danger ? C.danger : C.gold} style={{ width: 32 }} />
       <Txt medium style={{ flex: 1, fontSize: T.title, color: danger ? C.danger : C.textPrimary }}>{label}</Txt>
       {trailing}
@@ -137,7 +139,7 @@ export function GlassDialog({ visible, title, message, confirmLabel = 'OK', canc
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
       <View style={styles.dialogBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <Glass radius={R.l} fill="rgba(22,23,30,0.92)" intensity={60} style={{ width: '100%', maxWidth: 380 }}
+        <Glass radius={R.l} fill={C.sheet} intensity={60} style={{ width: '100%', maxWidth: 380 }}
           contentStyle={{ padding: S.xl }}>
           <Txt bold style={{ fontSize: T.title, marginBottom: S.s }}>{title}</Txt>
           {message ? <Txt style={{ color: C.textSecondary, marginBottom: S.l }}>{message}</Txt> : null}
@@ -173,7 +175,7 @@ export function ToastProvider({ children }) {
       {children}
       {t && (
         <Animated.View pointerEvents="none" style={[styles.toast, { top: insets.top + 12, opacity: op }]}>
-          <Glass radius={R.pill} fill="rgba(22,23,30,0.9)" contentStyle={{ paddingHorizontal: S.l, paddingVertical: S.m, flexDirection: 'row', alignItems: 'center' }}>
+          <Glass radius={R.pill} fill={C.sheet} contentStyle={{ paddingHorizontal: S.l, paddingVertical: S.m, flexDirection: 'row', alignItems: 'center' }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: S.s }} />
             <Txt medium style={{ fontSize: T.caption, flexShrink: 1 }}>{t.message}</Txt>
           </Glass>
@@ -187,9 +189,9 @@ const styles = StyleSheet.create({
   orb: { position: 'absolute', width: 260, height: 260, borderRadius: 130 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: S.l, height: 36, borderRadius: R.pill,
-    borderWidth: 1, borderColor: C.hairline, backgroundColor: 'rgba(255,255,255,0.05)' },
+    borderWidth: 1 },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2 },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: S.s, borderRadius: R.m },
   dialogBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: S.xl },
   toast: { position: 'absolute', left: S.xl, right: S.xl, alignItems: 'center' },
