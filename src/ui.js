@@ -58,7 +58,7 @@ export function IconBtn({ name, onPress, size = 22, color = C.textPrimary, style
 }
 
 export const Txt = ({ style, bold, medium, ...p }) => (
-  <Text {...p} style={[{ color: C.textPrimary, fontFamily: bold ? F.bold : medium ? F.medium : F.regular, fontSize: T.body }, style]} />
+  <Text {...p} style={[{ color: C.textPrimary, fontFamily: F.regular, fontWeight: bold ? '700' : medium ? '600' : '400', fontSize: T.body }, style]} />
 );
 
 export function Chip({ label, selected, onPress, icon }) {
