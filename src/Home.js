@@ -15,7 +15,7 @@ const SORT_LABELS = [
   [SORTS.TITLE_AZ, 'Title A → Z', 'text'], [SORTS.TITLE_ZA, 'Title Z → A', 'text'],
 ];
 
-export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockThen, selecting, setSelecting }) {
+export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockThen, selecting, setSelecting, onSettings }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const [query, setQuery] = useState('');
@@ -73,6 +73,7 @@ export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockT
         <Txt bold style={{ flex: 1, fontSize: T.headline }}>Note Pad</Txt>
         {!empty && <IconBtn name="swap-vertical" onPress={() => setSortOpen(true)} />}
         {!empty && <IconBtn name={grid ? 'list' : 'grid-outline'} onPress={toggleGrid} />}
+        <IconBtn name="settings-outline" onPress={onSettings} />
       </View>
 
       {selecting ? (
