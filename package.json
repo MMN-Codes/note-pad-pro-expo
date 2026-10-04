@@ -27,5 +27,8 @@
     "expo-notifications": "~0.32.12",
     "expo-status-bar": "~3.0.8"
   },
-  "devDependencies": { "@babel/core": "^7.25.2" }
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "babel-preset-expo": "~54.0.0"
+  }
 }
