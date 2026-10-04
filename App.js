@@ -1,20 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { C, R, S } from './src/theme';
-import { Background, Glass, ToastProvider, haptic, useToast } from './src/ui';
+import { C, MODE, R, S, T, applyPalette } from './src/theme';
+import { Background, Glass, GoldButton, ToastProvider, Txt, haptic, useToast } from './src/ui';
 import { addNote, getAllNotes, getNotesWithReminders, getTrashNotes, newNote, purgeOldTrash } from './src/db';
 import { initNotifications, rescheduleAll } from './src/notify';
 import { authenticate } from './src/lock';
+import { loadSettings, saveSettings } from './src/settings';
 import { fmtDate, fmtTime } from './src/utils';
 import Home from './src/Home';
 import Editor from './src/Editor';
 import Trash from './src/Trash';
 import Calendar from './src/Calendar';
 import Reminders from './src/Reminders';
+import Settings from './src/Settings';
+import About, { Legal } from './src/About';
+import Backup from './src/Backup';
 
 const TABS = [
   ['home', 'document-text', 'document-text-outline'],
@@ -27,11 +31,12 @@ function NavIsland({ tab, setTab, onNew }) {
   const insets = useSafeAreaInsets();
   return (
     <View pointerEvents="box-none" style={[styles.islandWrap, { bottom: insets.bottom + S.m }]}>
-      <Glass radius={R.pill} intensity={70} fill="rgba(22,23,30,0.62)" style={styles.island}
+      <Glass radius={R.pill} intensity={70} fill={C.sheet} style={styles.island}
         contentStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: S.s, height: 64 }}>
         {TABS.slice(0, 2).map(([k, on, off]) => <Tab key={k} k={k} on={on} off={off} tab={tab} setTab={setTab} />)}
-        <Pressable onPress={() => { haptic('medium'); onNew(); }} style={styles.fab}>
-          <Ionicons name="add" size={30} color="#1A1A1A" />
+        <Pressable onPress={() => { haptic('medium'); onNew(); }}
+          style={[styles.fab, { backgroundColor: C.gold, shadowColor: C.gold }]}>
+          <Ionicons name="add" size={30} color={C.onAccent} />
         </Pressable>
         {TABS.slice(2).map(([k, on, off]) => <Tab key={k} k={k} on={on} off={off} tab={tab} setTab={setTab} />)}
       </Glass>
@@ -42,13 +47,14 @@ function NavIsland({ tab, setTab, onNew }) {
 const Tab = ({ k, on, off, tab, setTab }) => (
   <Pressable onPress={() => { haptic(); setTab(k); }} style={styles.tab}>
     <Ionicons name={tab === k ? on : off} size={24} color={tab === k ? C.gold : C.textSecondary} />
-    {tab === k && <View style={styles.dot} />}
+    {tab === k && <View style={[styles.dot, { backgroundColor: C.gold }]} />}
   </Pressable>
 );
 
-function Shell() {
+function Shell({ settings, update }) {
   const toast = useToast();
   const [tab, setTab] = useState('home');
+  const [screen, setScreen] = useState(null); // null | settings | about | privacy | terms | backup
   const [notes, setNotes] = useState([]);
   const [trash, setTrash] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,16 +86,20 @@ function Shell() {
     })();
   }, [refresh]);
 
+  const goBack = useCallback(() => {
+    if (screen === 'privacy' || screen === 'terms') { setScreen('about'); return true; }
+    if (screen === 'about' || screen === 'backup') { setScreen('settings'); return true; }
+    if (screen) { setScreen(null); return true; }
+    if (selecting) { setSelecting(false); return true; }
+    if (tab !== 'home') { setTab('home'); return true; }
+    return false;
+  }, [screen, selecting, tab]);
+
   useEffect(() => {
-    if (Platform.OS !== 'android') return undefined;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (editing) return false; // Editor has its own back button
-      if (selecting) { setSelecting(false); return true; }
-      if (tab !== 'home') { setTab('home'); return true; }
-      return false;
-    });
+    if (Platform.OS !== 'android' || editing) return undefined; // Editor registers its own handler
+    const sub = BackHandler.addEventListener('hardwareBackPress', goBack);
     return () => sub.remove();
-  }, [editing, selecting, tab]);
+  }, [editing, goBack]);
 
   // Locked notes: biometric / device credential before opening or acting on them
   const unlockThen = async (note, fn) => {
@@ -101,9 +111,24 @@ function Shell() {
 
   if (editing) {
     return (
-      <Editor note={editing.note}
-        onClose={() => setEditing(null)}
+      <Editor note={editing.note} autoSave={settings.auto_save}
+        onClose={() => { setEditing(null); refresh(); }}
         onSaved={() => { setEditing(null); refresh(); }} />
+    );
+  }
+
+  if (screen) {
+    return (
+      <Background>
+        {screen === 'settings' && (
+          <Settings settings={settings} update={update} onClose={() => setScreen(null)}
+            onOpenTrash={() => { setScreen(null); setTab('trash'); }} onOpenBackup={() => setScreen('backup')}
+            onAbout={() => setScreen('about')} onCleared={() => { setScreen(null); setTab('home'); refresh(); }} />
+        )}
+        {screen === 'about' && <About onClose={() => setScreen('settings')} onLegal={(k) => setScreen(k)} />}
+        {(screen === 'privacy' || screen === 'terms') && <Legal kind={screen} onClose={() => setScreen('about')} />}
+        {screen === 'backup' && <Backup onClose={() => setScreen('settings')} onChanged={refresh} />}
+      </Background>
     );
   }
 
@@ -111,7 +136,7 @@ function Shell() {
     <Background>
       <View style={{ flex: 1 }}>
         {tab === 'home' && <Home notes={notes} loading={loading} onChanged={refresh} onOpen={open} onNew={() => setEditing({ note: null })}
-          unlockThen={unlockThen} selecting={selecting} setSelecting={setSelecting} />}
+          unlockThen={unlockThen} selecting={selecting} setSelecting={setSelecting} onSettings={() => setScreen('settings')} />}
         {tab === 'calendar' && <Calendar notes={notes} onOpen={open} />}
         {tab === 'reminders' && <Reminders notes={notes} onOpen={open} onChanged={refresh} />}
         {tab === 'trash' && <Trash notes={trash} onChanged={refresh} />}
@@ -121,20 +146,93 @@ function Shell() {
   );
 }
 
+// SplashActivity (simplified): app mark on themed background
+function Splash() {
+  return (
+    <Background>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 96, height: 96, borderRadius: 28, backgroundColor: C.gold, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="document-text" size={50} color={C.onAccent} />
+        </View>
+        <Txt bold style={{ fontSize: T.display, marginTop: S.l }}>Note Pad PRO</Txt>
+      </View>
+    </Background>
+  );
+}
+
+// App-level biometric lock (AppPrefs.biometric_lock)
+function LockScreen({ onUnlocked }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const tryUnlock = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    const r = await authenticate('Unlock Note Pad Pro', 'Confirm it is you');
+    setBusy(false);
+    if (r === 'ok' || r === 'unavailable') onUnlocked(); // never lock the user out if no screen lock exists
+    else toast('Authentication required', 'error');
+  }, [busy, onUnlocked, toast]);
+  useEffect(() => { tryUnlock(); }, []); // eslint-disable-line
+  return (
+    <Background>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: S.x3 }}>
+        <Ionicons name="lock-closed" size={52} color={C.gold} />
+        <Txt bold style={{ fontSize: T.headline, marginVertical: S.l }}>Note Pad Pro is locked</Txt>
+        <GoldButton icon="finger-print" label="Unlock" onPress={tryUnlock} />
+      </View>
+    </Background>
+  );
+}
+
+function Root() {
+  const scheme = useColorScheme();
+  const [settings, setSettings] = useState(null);
+  const [splash, setSplash] = useState(true);
+  const [locked, setLocked] = useState(false);
+
+  useEffect(() => {
+    loadSettings().then((s) => { setSettings(s); setLocked(!!s.biometric_lock && Platform.OS !== 'web'); setSplash(!s.skip_splash); });
+  }, []);
+  useEffect(() => {
+    if (!settings || !splash) return undefined;
+    const t = setTimeout(() => setSplash(false), 1100);
+    return () => clearTimeout(t);
+  }, [settings, splash]);
+
+  if (!settings) return <View style={{ flex: 1, backgroundColor: '#0F1015' }} />;
+
+  // Resolve Light / Dark / System, then push the palette into the shared theme object
+  const isDark = settings.mode === MODE.SYSTEM ? scheme === 'dark' : settings.mode === MODE.DARK;
+  applyPalette(settings.pack, isDark);
+  C.lite = !!settings.lite_mode;
+  const themeKey = `${settings.pack}-${isDark}-${C.lite}`;
+  const update = (patch) => { const n = { ...settings, ...patch }; setSettings(n); saveSettings(n); };
+
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ToastProvider>
+        {splash ? <Splash key={`s-${themeKey}`} />
+          : locked ? <LockScreen key={`l-${themeKey}`} onUnlocked={() => setLocked(false)} />
+          : <Shell key={themeKey} settings={settings} update={update} />}
+      </ToastProvider>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <ToastProvider><Shell /></ToastProvider>
+      <Root />
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   islandWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  island: { width: '88%', maxWidth: 420, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
+  island: { width: '88%', maxWidth: 420, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
   tab: { flex: 1, height: 56, alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.gold, marginTop: 3 },
-  fab: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.gold, alignItems: 'center', justifyContent: 'center', marginHorizontal: S.s,
-    shadowColor: C.gold, shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  dot: { width: 4, height: 4, borderRadius: 2, marginTop: 3 },
+  fab: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginHorizontal: S.s,
+    shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
 });
