@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
+import { AppState, BackHandler, Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { C, MODE, R, S, T, applyPalette } from './src/theme';
 import { Background, Glass, GoldButton, ToastProvider, Txt, haptic, useToast } from './src/ui';
-import { addNote, getAllNotes, getNotesWithReminders, getTrashNotes, newNote, purgeOldTrash } from './src/db';
+import { addNote, findNoteByTitle, getAllNotes, getNote, getNotesWithReminders, getTrashNotes, newNote, purgeOldTrash } from './src/db';
 import { initNotifications, rescheduleAll } from './src/notify';
 import { authenticate } from './src/lock';
 import { loadSettings, saveSettings } from './src/settings';
 import { fmtDate, fmtTime } from './src/utils';
+import { maybeSnapshot } from './src/snapshots';
+import { WELCOME_TEXT, WELCOME_TITLE } from './src/helpText';
 import Home from './src/Home';
 import Editor from './src/Editor';
 import Trash from './src/Trash';
@@ -19,6 +21,9 @@ import Reminders from './src/Reminders';
 import Settings from './src/Settings';
 import About, { Legal } from './src/About';
 import Backup from './src/Backup';
+import Intro from './src/Intro';
+import Help from './src/Help';
+import { QrImport } from './src/QrScreens';
 
 const TABS = [
   ['home', 'document-text', 'document-text-outline'],
@@ -54,12 +59,14 @@ const Tab = ({ k, on, off, tab, setTab }) => (
 function Shell({ settings, update }) {
   const toast = useToast();
   const [tab, setTab] = useState('home');
-  const [screen, setScreen] = useState(null); // null | settings | about | privacy | terms | backup
+  const [screen, setScreen] = useState(null); // null | settings | about | privacy | terms | backup | help | qr
   const [notes, setNotes] = useState([]);
   const [trash, setTrash] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // { note | null }
   const [selecting, setSelecting] = useState(false);
+  const [trail, setTrail] = useState([]);       // ids of notes we came from via [[links]]
+  const [qrText, setQrText] = useState('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -74,21 +81,29 @@ function Shell({ settings, update }) {
       const seen = await AsyncStorage.getItem('is_first_run_welcome_done');
       if (!seen) {
         const now = new Date();
-        const w = newNote('Welcome to Note Pad Pro 👋',
-          '• Tap + to write a note.\n• Long-press a note for pin, lock, share and more.\n• Use [[Note Title]] to refer to another note.\n• Set reminders so nothing slips your mind.\n\nTap Edit to make this note your own — or delete it and start fresh! ✨',
-          fmtDate(now), fmtTime(now));
+        const w = newNote(WELCOME_TITLE, WELCOME_TEXT, fmtDate(now), fmtTime(now));
         w.isPinned = true;
         await addNote(w);
         await AsyncStorage.setItem('is_first_run_welcome_done', '1');
       }
       await refresh();
       rescheduleAll(await getNotesWithReminders()); // BootReceiver equivalent
+      maybeSnapshot();                              // SnapshotRotator
+      // a scanned QR link opens https://<site>/n#payload on web -> offer to import it
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname.startsWith('/n') && window.location.hash.length > 10) {
+        setQrText(window.location.href); setScreen('qr');
+      }
     })();
   }, [refresh]);
 
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => { if (st !== 'active') maybeSnapshot(); });
+    return () => sub.remove();
+  }, []);
+
   const goBack = useCallback(() => {
     if (screen === 'privacy' || screen === 'terms') { setScreen('about'); return true; }
-    if (screen === 'about' || screen === 'backup') { setScreen('settings'); return true; }
+    if (screen === 'about' || screen === 'backup' || screen === 'help') { setScreen('settings'); return true; }
     if (screen) { setScreen(null); return true; }
     if (selecting) { setSelecting(false); return true; }
     if (tab !== 'home') { setTab('home'); return true; }
@@ -109,11 +124,27 @@ function Shell({ settings, update }) {
   };
   const open = (note) => (note.isLocked ? unlockThen(note, () => setEditing({ note })) : setEditing({ note }));
 
+  // [[Note Title]] links: open the target, remember where we came from
+  const openLinked = async (linkTitle, fromId) => {
+    const target = await findNoteByTitle(linkTitle);
+    if (!target) { toast(`Note not found: ${linkTitle}`, 'info'); return; }
+    const go = () => { if (fromId) setTrail((t) => [...t, fromId]); setEditing({ note: target }); };
+    if (target.isLocked) unlockThen(target, go); else go();
+  };
+  const closeEditor = async () => {
+    const parent = trail.length ? trail[trail.length - 1] : null;
+    setTrail((t) => t.slice(0, -1));
+    if (parent) { const n = await getNote(parent); setEditing(n ? { note: n } : null); } else setEditing(null);
+    refresh();
+  };
+
   if (editing) {
     return (
-      <Editor note={editing.note} autoSave={settings.auto_save}
-        onClose={() => { setEditing(null); refresh(); }}
-        onSaved={() => { setEditing(null); refresh(); }} />
+      <Editor key={editing.note ? editing.note.id : 'new'} note={editing.note} autoSave={settings.auto_save}
+        fontSize={settings.note_font_size_sp} onFontSize={(v) => update({ note_font_size_sp: v })}
+        imageQuality={settings.image_quality_mode} onOpenLink={openLinked}
+        onClose={closeEditor}
+        onSaved={() => { setTrail([]); setEditing(null); refresh(); }} />
     );
   }
 
@@ -123,11 +154,17 @@ function Shell({ settings, update }) {
         {screen === 'settings' && (
           <Settings settings={settings} update={update} onClose={() => setScreen(null)}
             onOpenTrash={() => { setScreen(null); setTab('trash'); }} onOpenBackup={() => setScreen('backup')}
-            onAbout={() => setScreen('about')} onCleared={() => { setScreen(null); setTab('home'); refresh(); }} />
+            onAbout={() => setScreen('about')} onHelp={() => setScreen('help')}
+            onCleared={() => { setScreen(null); setTab('home'); refresh(); }} />
         )}
         {screen === 'about' && <About onClose={() => setScreen('settings')} onLegal={(k) => setScreen(k)} />}
         {(screen === 'privacy' || screen === 'terms') && <Legal kind={screen} onClose={() => setScreen('about')} />}
         {screen === 'backup' && <Backup onClose={() => setScreen('settings')} onChanged={refresh} />}
+        {screen === 'help' && <Help onClose={() => setScreen('settings')} onIntro={() => update({ intro_done: false })} />}
+        {screen === 'qr' && (
+          <QrImport initialText={qrText} onClose={() => { setScreen(null); setQrText(''); }}
+            onImported={() => { setScreen(null); setQrText(''); setTab('home'); refresh(); }} />
+        )}
       </Background>
     );
   }
@@ -136,7 +173,8 @@ function Shell({ settings, update }) {
     <Background>
       <View style={{ flex: 1 }}>
         {tab === 'home' && <Home notes={notes} loading={loading} onChanged={refresh} onOpen={open} onNew={() => setEditing({ note: null })}
-          unlockThen={unlockThen} selecting={selecting} setSelecting={setSelecting} onSettings={() => setScreen('settings')} />}
+          unlockThen={unlockThen} selecting={selecting} setSelecting={setSelecting}
+          onSettings={() => setScreen('settings')} onScanQr={() => setScreen('qr')} />}
         {tab === 'calendar' && <Calendar notes={notes} onOpen={open} />}
         {tab === 'reminders' && <Reminders notes={notes} onOpen={open} onChanged={refresh} />}
         {tab === 'trash' && <Trash notes={trash} onChanged={refresh} />}
@@ -213,6 +251,7 @@ function Root() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <ToastProvider>
         {splash ? <Splash key={`s-${themeKey}`} />
+          : !settings.intro_done ? <Background key={`i-${themeKey}`}><Intro onDone={() => update({ intro_done: true })} /></Background>
           : locked ? <LockScreen key={`l-${themeKey}`} onUnlocked={() => setLocked(false)} />
           : <Shell key={themeKey} settings={settings} update={update} />}
       </ToastProvider>
