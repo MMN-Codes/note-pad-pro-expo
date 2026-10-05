@@ -2,7 +2,7 @@
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Directory, File, Paths } from 'expo-file-system';
 
 const WIDTH = { original: 2160, balanced: 1080, saver: 960 };
 const QUALITY = { original: 0.92, balanced: 0.85, saver: 0.75 };
@@ -19,9 +19,9 @@ export async function pickCoverImage(mode = 'balanced') {
     compress: web ? 0.7 : QUALITY[mode] || 0.85, format: ImageManipulator.SaveFormat.JPEG, base64: web,
   });
   if (web) return `data:image/jpeg;base64,${out.base64}`;
-  const dir = `${FileSystem.documentDirectory}note_images/`;
-  try { await FileSystem.makeDirectoryAsync(dir, { intermediates: true }); } catch {}
-  const dest = `${dir}cover_${Date.now()}.jpg`;
-  await FileSystem.copyAsync({ from: out.uri, to: dest });
-  return dest;
+  const dir = new Directory(Paths.document, 'note_images');
+  try { dir.create({ intermediates: true, idempotent: true }); } catch {}
+  const dest = new File(dir, `cover_${Date.now()}.jpg`);
+  new File(out.uri).copy(dest);
+  return dest.uri;
 }
