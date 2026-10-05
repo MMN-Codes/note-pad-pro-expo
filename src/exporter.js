@@ -1,5 +1,5 @@
 // ExportFormatter.java — one .md per note (YAML front-matter), zipped.
-import JSZip from 'jszip';
+import { defaultOf, tryRequire } from './lazy';
 import { safeName } from './files';
 
 const orDash = (v) => (v == null || v === '' ? '-' : v);
@@ -23,6 +23,8 @@ export function markdownFileName(note) {
 
 // -> { base64, exported, skippedLocked }
 export async function buildMarkdownZip(notes, includeLocked) {
+  const JSZip = defaultOf(tryRequire(() => require('jszip')));
+  if (!JSZip) throw new Error('ZIP library is not available in this preview');
   const zip = new JSZip();
   const used = new Set();
   let exported = 0, skippedLocked = 0;
