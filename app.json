@@ -21,7 +21,9 @@
         "android.permission.POST_NOTIFICATIONS"
       ]
     },
-    "web": { "bundler": "metro", "output": "single" },
+    "web": {
+      "bundler": "metro"
+    },
     "plugins": [
       [
         "expo-notifications",
@@ -29,7 +31,13 @@
           "color": "#FFD700"
         }
       ],
-      "expo-local-authentication"
+      "expo-local-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a cover photo for your notes."
+        }
+      ]
     ]
   }
 }
