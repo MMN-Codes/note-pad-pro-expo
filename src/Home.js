@@ -9,13 +9,15 @@ import NoteCard from './NoteCard';
 import { SORTS, applySort, filterNotes } from './rules';
 import { moveToTrash, setNoteLocked, setNotePinned } from './db';
 import { authenticate } from './lock';
+import { buildMarkdown, markdownFileName } from './exporter';
+import { shareFile } from './files';
 
 const SORT_LABELS = [
   [SORTS.NEWEST, 'Newest first', 'arrow-down'], [SORTS.OLDEST, 'Oldest first', 'arrow-up'],
   [SORTS.TITLE_AZ, 'Title A → Z', 'text'], [SORTS.TITLE_ZA, 'Title Z → A', 'text'],
 ];
 
-export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockThen, selecting, setSelecting, onSettings }) {
+export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockThen, selecting, setSelecting, onSettings, onScanQr }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const [query, setQuery] = useState('');
@@ -60,6 +62,10 @@ export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockT
   const share = async (n) => {
     try { await Share.share({ title: n.title, message: `${n.title}\n\n${n.content || ''}`.trim() }); } catch {}
   };
+  const exportMd = async (n) => {
+    try { await shareFile(markdownFileName(n), buildMarkdown(n), { mime: 'text/markdown' }); }
+    catch (e) { toast(`Export failed: ${e.message}`, 'error'); }
+  };
   const doTrash = async () => {
     const ids = confirmTrash === 'batch' ? selected : [confirmTrash.id];
     for (const id of ids) await moveToTrash(id);
@@ -73,6 +79,7 @@ export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockT
         <Txt bold style={{ flex: 1, fontSize: T.headline }}>Note Pad</Txt>
         {!empty && <IconBtn name="swap-vertical" onPress={() => setSortOpen(true)} />}
         {!empty && <IconBtn name={grid ? 'list' : 'grid-outline'} onPress={toggleGrid} />}
+        <IconBtn name="qr-code-outline" onPress={onScanQr} />
         <IconBtn name="settings-outline" onPress={onSettings} />
       </View>
 
@@ -133,6 +140,7 @@ export default function Home({ notes, loading, onChanged, onOpen, onNew, unlockT
             <SheetRow icon={actionNote.isPinned ? 'pin-outline' : 'pin'} label={actionNote.isPinned ? 'Unpin' : 'Pin to top'} onPress={() => { close(); togglePin(actionNote); }} />
             <SheetRow icon={actionNote.isLocked ? 'lock-open-outline' : 'lock-closed-outline'} label={actionNote.isLocked ? 'Remove lock' : 'Lock note'} onPress={() => { close(); toggleLock(actionNote); }} />
             <SheetRow icon="share-outline" label="Share" onPress={() => { close(); share(actionNote); }} />
+            <SheetRow icon="document-text-outline" label="Export as Markdown" onPress={() => { close(); exportMd(actionNote); }} />
             <SheetRow icon="checkbox-outline" label="Select multiple" onPress={() => { const id = actionNote.id; close(); setSelecting(true); setSelected([id]); }} />
             <SheetRow icon="trash-outline" danger label="Move to Trash" onPress={() => { const n = actionNote; close(); setTimeout(() => setConfirmTrash(n), 220); }} />
           </>
