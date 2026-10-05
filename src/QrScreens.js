@@ -1,10 +1,8 @@
 // NoteQrHelper UI: show a note as a QR code + import a note from a QR image / link
 import React, { useRef, useState } from 'react';
 import { Platform, ScrollView, Share, TextInput, View } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
-import * as ImagePicker from 'expo-image-picker';
-import { CameraView } from 'expo-camera';
-import * as Clipboard from 'expo-clipboard';
+import { copyText, pasteText } from './clip';
+import { defaultOf, tryRequire } from './lazy';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, R, S, T } from './theme';
 import { Glass, GlassSheet, GoldButton, IconBtn, Txt, useToast } from './ui';
@@ -13,11 +11,15 @@ import { addNote, newNote } from './db';
 import { shareFile } from './files';
 import { fmtDate, fmtTime } from './utils';
 
+const getQR = () => defaultOf(tryRequire(() => require('react-native-qrcode-svg')));
+
 export function QrShareSheet({ visible, onClose, title, content }) {
   const toast = useToast();
   const qrRef = useRef(null);
-  const link = visible ? buildQrContent({ title, content }) : '';
-  const tooBig = visible && isQrContentTooLarge(link);
+  let link = '';
+  if (visible) { try { link = buildQrContent({ title, content }); } catch { link = ''; } }
+  const tooBig = visible && !!link && isQrContentTooLarge(link);
+  const QRCode = visible ? getQR() : null;
 
   const shareImage = () => {
     try {
@@ -32,11 +34,18 @@ export function QrShareSheet({ visible, onClose, title, content }) {
     <GlassSheet visible={visible} onClose={onClose} title="Share as QR code">
       {() => (
         <View style={{ alignItems: 'center', paddingBottom: S.m }}>
+          {visible && (!QRCode || !link) ? (
+            <>
+              <Txt style={{ color: C.textSecondary, textAlign: 'center', marginVertical: S.xl }}>
+                QR code is not available in this preview. Use the full app build or the web version.
+              </Txt>
+            </>
+          ) : null}
           {tooBig ? (
             <Txt style={{ color: C.textSecondary, textAlign: 'center', marginVertical: S.xl }}>
               This note is too long to fit in a QR code reliably. Shorten it, or share it as text / Markdown instead.
             </Txt>
-          ) : (
+          ) : QRCode && link ? (
             <>
               <View style={{ padding: S.m, backgroundColor: '#FFFFFF', borderRadius: R.m }}>
                 <QRCode value={link} size={230} ecl="M" getRef={(c) => { qrRef.current = c; }} />
@@ -50,7 +59,7 @@ export function QrShareSheet({ visible, onClose, title, content }) {
                 <GoldButton icon="image-outline" label="Share image" style={{ flex: 1 }} onPress={shareImage} />
               </View>
             </>
-          )}
+          ) : null}
         </View>
       )}
     </GlassSheet>
@@ -76,14 +85,17 @@ export function QrImport({ onClose, onImported, initialText = '' }) {
   const fromGallery = async () => {
     try {
       setBusy(true);
+      const ImagePicker = tryRequire(() => require('expo-image-picker'));
+      const Cam = tryRequire(() => require('expo-camera'));
+      if (!ImagePicker || !Cam || !Cam.CameraView) { toast('Scanning from a photo needs the full app build', 'error'); return; }
       const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
       if (r.canceled || !r.assets || !r.assets.length) return;
-      const found = await CameraView.scanFromURLAsync(r.assets[0].uri, ['qr']);
+      const found = await Cam.CameraView.scanFromURLAsync(r.assets[0].uri, ['qr']);
       if (!found || !found.length) { toast('No QR code found in this image', 'error'); return; }
       await importFrom(found[0].data);
     } catch (e) { toast(`Scan failed: ${e.message}`, 'error'); } finally { setBusy(false); }
   };
-  const paste = async () => { try { setText(await Clipboard.getStringAsync()); } catch {} };
+  const paste = async () => { try { setText(await pasteText()); } catch (e) { toast(e.message, 'error'); } };
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top + S.s }}>
