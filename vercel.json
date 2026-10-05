@@ -1,4 +1,5 @@
 {
+  "installCommand": "npm install && npx expo install --fix",
   "buildCommand": "npx expo export -p web",
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
