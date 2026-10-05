@@ -1,6 +1,6 @@
-// Save / share / pick files on native + web
+// Save / share / pick files on native + web (expo-file-system new API: File / Paths)
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { b64ToBytes } from './b64';
@@ -19,12 +19,11 @@ export async function shareFile(name, content, { base64 = false, mime = 'applica
     setTimeout(() => URL.revokeObjectURL(url), 3000);
     return;
   }
-  const uri = FileSystem.cacheDirectory + fname;
-  await FileSystem.writeAsStringAsync(uri, content, {
-    encoding: base64 ? FileSystem.EncodingType.Base64 : FileSystem.EncodingType.UTF8,
-  });
+  const file = new File(Paths.cache, fname);
+  file.create({ overwrite: true });
+  file.write(base64 ? b64ToBytes(content) : content);
   if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device');
-  await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: fname });
+  await Sharing.shareAsync(file.uri, { mimeType: mime, dialogTitle: fname });
 }
 
 // -> { name, text } | null (cancelled)
@@ -34,6 +33,6 @@ export async function pickTextFile() {
   const a = res.assets[0];
   let text;
   if (Platform.OS === 'web') text = a.file ? await a.file.text() : await (await fetch(a.uri)).text();
-  else text = await FileSystem.readAsStringAsync(a.uri, { encoding: FileSystem.EncodingType.UTF8 });
+  else text = await new File(a.uri).text();
   return { name: a.name, text };
 }
