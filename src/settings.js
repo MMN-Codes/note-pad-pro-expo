@@ -11,6 +11,7 @@ export const DEFAULTS = {
   skip_splash: false,         // AppPrefs.skip_splash
   image_quality_mode: 'balanced',
   intro_done: false,
+  note_font_size_sp: 16,      // AddEditNoteActivity note_font_size_sp (14..26)
 };
 export async function loadSettings() {
   try { const raw = await AsyncStorage.getItem(KEY); return { ...DEFAULTS, ...(raw ? JSON.parse(raw) : {}) }; }
