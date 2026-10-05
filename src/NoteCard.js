@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BG_STYLES, C, F, PRISM, R, S, T, alpha } from './theme';
 import { Glass, Txt } from './ui';
@@ -26,7 +26,8 @@ export default function NoteCard({ note, onPress, onLongPress, query = '', grid,
   const titleColor = bg ? bg.text : C.textPrimary;
   const subColor = bg ? bg.text : C.textSecondary;
   const { done, total } = note.isChecklist ? checklistProgress(note) : { done: 0, total: 0 };
-  const showBadge = note.isChecklist && !note.isLocked && !grid;
+  const hasCover = !!note.coverImagePath && !note.isLocked;           // locked notes never show a preview
+  const showBadge = note.isChecklist && !note.isLocked && !grid && !hasCover;
   const title = note.title || 'Untitled Note';
 
   const icons = (
@@ -48,24 +49,30 @@ export default function NoteCard({ note, onPress, onLongPress, query = '', grid,
       <Glass blur={false} radius={R.l}
         fill={bg ? bg.fill : C.glassFillSubtle}
         borderColors={selected ? [C.gold, C.gold] : bg ? [bg.stroke, bg.stroke] : PRISM}
-        contentStyle={{ padding: S.l, flexDirection: 'row', minHeight: grid ? 120 : 0 }}>
-        {showBadge && (
-          <View style={{ width: 56, height: 56, borderRadius: R.s, marginRight: S.m, alignItems: 'center',
-            justifyContent: 'center', backgroundColor: C.soft }}>
-            <Text style={{ color: C.gold, fontFamily: F.regular, fontWeight: '700', fontSize: T.micro }}>{done}/{total}</Text>
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Highlight text={title} query={query} numberOfLines={1}
-              style={{ flex: 1, color: titleColor, fontFamily: F.regular, fontWeight: '700', fontSize: T.title }} />
-            {icons}
-          </View>
-          <Highlight text={notePreview(note)} query={note.isLocked ? '' : query} numberOfLines={grid ? 4 : 2}
-            style={{ color: subColor, opacity: bg ? 0.85 : 1, fontFamily: F.regular, fontSize: T.body, marginTop: 6 }} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: S.m }}>
-            <Txt style={{ color: subColor, opacity: 0.8, fontSize: T.micro, flex: 1 }}>{note.date}  •  {note.time}</Txt>
-            {selected && <Ionicons name="checkmark-circle" size={20} color={C.gold} />}
+        contentStyle={{ flexDirection: grid ? 'column' : 'row', minHeight: grid ? 120 : 0 }}>
+        {hasCover && grid && <Image source={{ uri: note.coverImagePath }} style={{ width: '100%', height: 84, backgroundColor: C.soft }} resizeMode="cover" />}
+        <View style={{ flexDirection: 'row', padding: S.l, flex: grid ? 1 : undefined }}>
+          {hasCover && !grid && (
+            <Image source={{ uri: note.coverImagePath }} style={{ width: 56, height: 56, borderRadius: R.s, marginRight: S.m, backgroundColor: C.soft }} resizeMode="cover" />
+          )}
+          {showBadge && (
+            <View style={{ width: 56, height: 56, borderRadius: R.s, marginRight: S.m, alignItems: 'center',
+              justifyContent: 'center', backgroundColor: C.soft }}>
+              <Text style={{ color: C.gold, fontFamily: F.regular, fontWeight: '700', fontSize: T.micro }}>{done}/{total}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Highlight text={title} query={query} numberOfLines={1}
+                style={{ flex: 1, color: titleColor, fontFamily: F.regular, fontWeight: '700', fontSize: T.title }} />
+              {icons}
+            </View>
+            <Highlight text={notePreview(note)} query={note.isLocked ? '' : query} numberOfLines={grid ? 4 : 2}
+              style={{ color: subColor, opacity: bg ? 0.85 : 1, fontFamily: F.regular, fontSize: T.body, marginTop: 6 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: S.m }}>
+              <Txt style={{ color: subColor, opacity: 0.8, fontSize: T.micro, flex: 1 }}>{note.date}  •  {note.time}</Txt>
+              {selected && <Ionicons name="checkmark-circle" size={20} color={C.gold} />}
+            </View>
           </View>
         </View>
       </Glass>
