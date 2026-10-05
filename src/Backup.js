@@ -2,7 +2,7 @@
 // restore/merge from file or paste, and the 3 rotating automatic snapshots.
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, ScrollView, Switch, TextInput, View } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+import { copyText, pasteText } from './clip';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F, R, S, T, alpha } from './theme';
@@ -54,7 +54,7 @@ export default function Backup({ onClose, onChanged }) {
 
   // ---------- export ----------
   const deliver = async (content, viaCopy) => {
-    if (viaCopy) { await Clipboard.setStringAsync(content); toast('Backup copied to clipboard', 'success'); }
+    if (viaCopy) { await copyText(content); toast('Backup copied to clipboard', 'success'); }
     else { await shareFile(backupFileName(encrypt ? 'npbak' : 'json'), content, { mime: 'application/json' }); toast('Backup file ready', 'success'); }
     await stamp();
   };
@@ -166,7 +166,7 @@ export default function Backup({ onClose, onChanged }) {
             style={{ minHeight: 100, maxHeight: 200, borderRadius: R.m, padding: S.m, color: C.textPrimary, backgroundColor: C.soft,
               fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 12, textAlignVertical: 'top' }} />
           <View style={{ flexDirection: 'row', gap: S.m, marginTop: S.m }}>
-            <GoldButton subtle icon="clipboard-outline" label="Paste" onPress={async () => { try { setText(await Clipboard.getStringAsync()); } catch {} }} style={{ flex: 1 }} />
+            <GoldButton subtle icon="clipboard-outline" label="Paste" onPress={async () => { try { setText(await pasteText()); } catch {} }} style={{ flex: 1 }} />
             <GoldButton icon="download-outline" label="Restore" onPress={() => !busy && handleRestoreText(text)} style={{ flex: 1 }} />
           </View>
         </Glass>
