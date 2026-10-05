@@ -62,7 +62,7 @@ function Preview({ pack, dark, label, selected, onPress, system }) {
   );
 }
 
-export default function Settings({ settings, update, onClose, onOpenTrash, onOpenBackup, onCleared, onAbout }) {
+export default function Settings({ settings, update, onClose, onOpenTrash, onOpenBackup, onCleared, onAbout, onHelp }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const [qSheet, setQSheet] = useState(false);
@@ -137,6 +137,8 @@ export default function Settings({ settings, update, onClose, onOpenTrash, onOpe
 
         <Section label="About">
           <Row icon="information-circle-outline" label="About Note Pad Pro" onPress={onAbout}
+            right={<Ionicons name="chevron-forward" size={18} color={C.textSecondary} />} />
+          <Row icon="help-circle-outline" label="Help & Tips" onPress={onHelp}
             right={<Ionicons name="chevron-forward" size={18} color={C.textSecondary} />} />
           <Row icon="star-outline" label="Rate the app" onPress={() => open('https://play.google.com/store/apps/details?id=mmn.notepadpro.app')} />
         </Section>
